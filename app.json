@@ -1,15 +1,18 @@
 {
   "expo": {
-    "name": "app-de-asdrubal",
+    "name": "Control de Faltas",
     "slug": "app-de-asdrubal",
+    "scheme": "appdeasdrubal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asdrubal.controldefaltas"
     },
     "android": {
+      "package": "com.asdrubal.controldefaltas",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -19,7 +22,12 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar"
+    ]
   }
 }
