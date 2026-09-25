@@ -1,7 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 
+import { useFocusRefresh } from '@/hooks/useFocusRefresh';
+import { reportError } from '@/lib/errors';
 import { catalogService } from '@/services/catalogService';
 import { cardShadow, radius, useTheme, useThemedStyles } from '@/theme';
 import type { CatalogTable } from '@/types/database';
@@ -81,15 +83,13 @@ export function CatalogList<T extends { id: string }>({
     try {
       setItems(await catalogService.list<T>(table));
     } catch (error) {
-      Alert.alert('Error', `No se pudo cargar la lista: ${(error as Error).message}`);
+      Alert.alert('Error', `No se pudo cargar la lista: ${reportError('catalog-load', error)}`);
     } finally {
       setLoading(false);
     }
   }, [table]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusRefresh(load);
 
   const handleAdd = async () => {
     const requiredField = fields[0];
@@ -110,7 +110,7 @@ export function CatalogList<T extends { id: string }>({
       setFormValues({});
       await load();
     } catch (error) {
-      Alert.alert('Error', `No se pudo agregar: ${(error as Error).message}`);
+      Alert.alert('Error', `No se pudo agregar: ${reportError('catalog-create', error)}`);
     } finally {
       setSaving(false);
     }
@@ -120,7 +120,8 @@ export function CatalogList<T extends { id: string }>({
     try {
       await catalogService.remove(table, item.id);
       await load();
-    } catch {
+    } catch (error) {
+      reportError('catalog-remove', error);
       Alert.alert(
         'No se pudo eliminar',
         'Este registro está siendo usado en una o más faltas registradas, así que no se puede borrar.'

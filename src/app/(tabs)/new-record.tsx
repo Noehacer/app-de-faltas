@@ -1,21 +1,18 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
 import { FormField } from '@/components/FormField';
 import { SelectField, type SelectOption } from '@/components/SelectField';
 import { Button, Chip, Screen } from '@/components/ui';
+import { useFocusRefresh } from '@/hooks/useFocusRefresh';
+import { daysAgoIso } from '@/lib/dates';
+import { reportError } from '@/lib/errors';
 import { SHIFT_LABEL } from '@/lib/shifts';
 import { attendanceService } from '@/services/attendanceService';
 import { catalogService } from '@/services/catalogService';
 import { cardShadow, radius, useThemedStyles } from '@/theme';
 import type { ClassPeriod, Student, Subject, Teacher } from '@/types/database';
-
-function isoDaysAgo(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
-}
 
 export default function NewRecordScreen() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -24,7 +21,7 @@ export default function NewRecordScreen() {
   const [periods, setPeriods] = useState<ClassPeriod[]>([]);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
-  const [occurredOn, setOccurredOn] = useState(isoDaysAgo(0));
+  const [occurredOn, setOccurredOn] = useState(daysAgoIso(0));
   const [periodId, setPeriodId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState<string | null>(null);
@@ -32,6 +29,7 @@ export default function NewRecordScreen() {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [group, setGroup] = useState<string | null>(null);
+  const [appliedParamsKey, setAppliedParamsKey] = useState<string | undefined>(undefined);
   const params = useLocalSearchParams<{
     k?: string;
     period?: string;
@@ -41,15 +39,15 @@ export default function NewRecordScreen() {
     date?: string;
   }>();
 
-  useEffect(() => {
-    if (!params.k) return;
+  if (params.k && params.k !== appliedParamsKey) {
+    setAppliedParamsKey(params.k);
     setPeriodId(params.period ?? null);
     setSubjectId(params.subject ?? null);
     setTeacherId(params.teacher ?? null);
     setStudentId(null);
     setGroup(params.group ?? null);
     if (params.date) setOccurredOn(params.date);
-  }, [params.k]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const styles = useThemedStyles((t) => ({
     container: { flex: 1, backgroundColor: t.background },
@@ -81,17 +79,13 @@ export default function NewRecordScreen() {
       setStudents(studentsData);
       setPeriods(periodsData);
     } catch (error) {
-      Alert.alert('Error', `No se pudieron cargar los catálogos: ${(error as Error).message}`);
+      Alert.alert('Error', `No se pudieron cargar los catálogos: ${reportError('new-record-load-catalogs', error)}`);
     } finally {
       setLoadingCatalogs(false);
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadCatalogs();
-    }, [loadCatalogs])
-  );
+  useFocusRefresh(loadCatalogs);
 
   const periodOptions: SelectOption[] = useMemo(
     () => periods.map((p) => ({ id: p.id, label: `${p.label} · ${SHIFT_LABEL[p.shift] ?? SHIFT_LABEL.matutino}` })),
@@ -103,7 +97,7 @@ export default function NewRecordScreen() {
     () => students
       .filter((s) => !group || s.grade_group?.trim() === group)
       .map((s) => ({ id: s.id, label: s.grade_group ? `${s.full_name} · ${s.grade_group}` : s.full_name })),
-    [students]
+    [students, group]
   );
 
   const resetForm = () => {
@@ -113,7 +107,7 @@ export default function NewRecordScreen() {
     setStudentId(null);
     setReason('');
     setGroup(null);
-    setOccurredOn(isoDaysAgo(0));
+    setOccurredOn(daysAgoIso(0));
   };
 
   const handleSubmit = async () => {
@@ -138,7 +132,7 @@ export default function NewRecordScreen() {
       Alert.alert('Guardado', 'La falta se registró correctamente.');
       resetForm();
     } catch (error) {
-      Alert.alert('Error', `No se pudo guardar: ${(error as Error).message}`);
+      Alert.alert('Error', `No se pudo guardar: ${reportError('new-record-create', error)}`);
     } finally {
       setSaving(false);
     }
@@ -162,8 +156,8 @@ export default function NewRecordScreen() {
           <View style={styles.card}>
             <Text style={styles.label}>FECHA</Text>
             <View style={styles.chips}>
-              <Chip label="Hoy" active={occurredOn === isoDaysAgo(0)} onPress={() => setOccurredOn(isoDaysAgo(0))} />
-              <Chip label="Ayer" active={occurredOn === isoDaysAgo(1)} onPress={() => setOccurredOn(isoDaysAgo(1))} />
+              <Chip label="Hoy" active={occurredOn === daysAgoIso(0)} onPress={() => setOccurredOn(daysAgoIso(0))} />
+              <Chip label="Ayer" active={occurredOn === daysAgoIso(1)} onPress={() => setOccurredOn(daysAgoIso(1))} />
             </View>
             <FormField icon="calendar-outline" value={occurredOn} onChangeText={setOccurredOn} placeholder="AAAA-MM-DD" />
 

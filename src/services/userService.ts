@@ -37,7 +37,7 @@ export const userService = {
   },
 
   async setActive(id: string, active: boolean) {
-    const { error } = await supabase.from('profiles').update({ active }).eq('id', id);
+    const { error } = await supabase.rpc('admin_set_active', { p_user_id: id, p_active: active });
     if (error) throw error;
   },
 };

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs } from 'expo-router';
 import { ActivityIndicator, type ColorValue, Text, View } from 'react-native';
 
@@ -40,11 +40,12 @@ export default function TabsLayout() {
   if (!session) return <Redirect href="/(auth)/login" />;
   if (!profile) return <NoAccess />;
 
-  const icon =
-    (focused: string, idle: string) =>
-    ({ color, size, focused: f }: { color: ColorValue; size: number; focused: boolean }) => (
-      <Ionicons name={(f ? focused : idle) as never} size={size} color={color} />
-    );
+  const icon = (focused: string, idle: string) => {
+    function TabIcon({ color, size, focused: f }: { color: ColorValue; size: number; focused: boolean }) {
+      return <Ionicons name={(f ? focused : idle) as never} size={size} color={color} />;
+    }
+    return TabIcon;
+  };
 
   return (
     <Tabs

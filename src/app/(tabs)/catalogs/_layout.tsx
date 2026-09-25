@@ -1,9 +1,12 @@
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 
+import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/theme';
 
 export default function CatalogsLayout() {
   const theme = useTheme();
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Redirect href="/(tabs)" />;
   return (
     <Stack
       screenOptions={{

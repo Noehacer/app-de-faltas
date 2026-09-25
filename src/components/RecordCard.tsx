@@ -1,21 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Text, View } from 'react-native';
 
+import { shortDateParts } from '@/lib/dates';
 import { cardShadow, radius, useTheme, useThemedStyles } from '@/theme';
 import type { AttendanceRecordWithRelations } from '@/types/database';
 
 import { Badge } from './ui';
 
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-
-function parts(isoDate: string) {
-  const [, month, day] = isoDate.split('-');
-  return { day, month: MONTHS[Number(month) - 1] };
-}
-
 export function RecordCard({ record }: { record: AttendanceRecordWithRelations }) {
   const theme = useTheme();
-  const { day, month } = parts(record.occurred_on);
+  const { day, month } = shortDateParts(record.occurred_on);
   const styles = useThemedStyles((t) => ({
     card: {
       flexDirection: 'row',

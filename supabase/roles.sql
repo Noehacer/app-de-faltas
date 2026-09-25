@@ -91,6 +91,20 @@ create policy "owner or admin update" on attendance_records for update to authen
 create policy "owner or admin delete" on attendance_records for delete to authenticated
   using (public.is_admin() or created_by = auth.uid());
 
+-- Evita que el cliente falsifique created_by: siempre se fija al usuario autenticado real.
+create or replace function public.set_attendance_created_by() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.created_by := auth.uid();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_attendance_created_by on attendance_records;
+create trigger trg_attendance_created_by
+  before insert on attendance_records
+  for each row execute function public.set_attendance_created_by();
+
 -- Cuentas que ya existen: la más antigua pasa a ser encargado, las demás maestros.
 insert into profiles (id, full_name, email, role)
 select u.id,

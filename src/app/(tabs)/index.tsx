@@ -1,11 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 
 import { RecordCard } from '@/components/RecordCard';
 import { Chip, EmptyState, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { useFocusRefresh } from '@/hooks/useFocusRefresh';
+import { reportError } from '@/lib/errors';
 import { attendanceService, type AttendanceDateFilter } from '@/services/attendanceService';
 import { cardShadow, radius, useTheme, useThemedStyles } from '@/theme';
 import type { AttendanceRecordWithRelations } from '@/types/database';
@@ -68,13 +69,15 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     try {
       setRecords(await attendanceService.list(dateFilter));
+    } catch (error) {
+      Alert.alert('Error', `No se pudieron cargar las faltas: ${reportError('home-load', error)}`);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [dateFilter]);
 
-  useFocusEffect(
+  useFocusRefresh(
     useCallback(() => {
       setLoading(true);
       load();

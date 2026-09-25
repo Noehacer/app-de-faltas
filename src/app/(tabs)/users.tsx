@@ -1,11 +1,13 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Redirect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 
 import { FormField } from '@/components/FormField';
 import { Badge, Button, Chip, EmptyState, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { useFocusRefresh } from '@/hooks/useFocusRefresh';
+import { reportError } from '@/lib/errors';
 import { ROLE_LABEL, ROLE_ORDER, ROLE_TONE } from '@/lib/roles';
 import { userService } from '@/services/userService';
 import { cardShadow, radius, useTheme, useThemedStyles } from '@/theme';
@@ -13,7 +15,7 @@ import type { Profile, Role } from '@/types/database';
 
 export default function UsersScreen() {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,17 +61,13 @@ export default function UsersScreen() {
     try {
       setUsers(await userService.list());
     } catch (error) {
-      Alert.alert('Error', `No se pudo cargar la lista: ${(error as Error).message}`);
+      Alert.alert('Error', `No se pudo cargar la lista: ${reportError('users-load', error)}`);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useFocusRefresh(load);
 
   const handleCreate = async () => {
     if (!fullName.trim() || !email.trim() || password.length < 6) {
@@ -86,7 +84,7 @@ export default function UsersScreen() {
       await load();
       Alert.alert('Cuenta creada', 'Entrégale el correo y la contraseña a la persona.');
     } catch (error) {
-      Alert.alert('No se pudo crear la cuenta', (error as Error).message);
+      Alert.alert('No se pudo crear la cuenta', reportError('users-create-account', error));
     } finally {
       setSaving(false);
     }
@@ -107,13 +105,15 @@ export default function UsersScreen() {
               await userService.setActive(profile.id, next);
               await load();
             } catch (error) {
-              Alert.alert('Error', (error as Error).message);
+              Alert.alert('Error', reportError('users-toggle-active', error));
             }
           },
         },
       ]
     );
   };
+
+  if (!isAdmin) return <Redirect href="/(tabs)" />;
 
   return (
     <Screen>

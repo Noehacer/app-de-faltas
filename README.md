@@ -56,6 +56,7 @@ supabase/schema.sql          # Script SQL con las tablas y permisos (RLS) de Sup
    2. [`supabase/roles.sql`](supabase/roles.sql): crea la tabla `profiles`, los roles y los permisos por rol. La cuenta más antigua que exista pasa a ser **encargado** y las demás **maestro**.
    3. [`supabase/roles_encargado_clase.sql`](supabase/roles_encargado_clase.sql): agrega el rol **Encargado de clase**.
    4. [`supabase/schedule.sql`](supabase/schedule.sql): agrega los turnos a los horarios y la tabla del horario semanal.
+   5. [`supabase/audit.sql`](supabase/audit.sql): agrega la tabla `audit_log` (creación/activación/desactivación de cuentas) y registra quién creó cada registro de catálogo y horario.
 
    Para la primera instalación, crea antes tu cuenta en **Authentication → Users → Add user** (con "Auto Confirm User" activado) y luego corre `roles.sql`.
 4. En **Settings → API**, copia el **Project URL** y la **anon public key**.
