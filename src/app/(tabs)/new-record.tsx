@@ -1,29 +1,19 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
 import { FormField } from '@/components/FormField';
 import { SelectField, type SelectOption } from '@/components/SelectField';
+import { Button, Chip, Screen } from '@/components/ui';
+import { SHIFT_LABEL } from '@/lib/shifts';
 import { attendanceService } from '@/services/attendanceService';
 import { catalogService } from '@/services/catalogService';
+import { cardShadow, radius, useThemedStyles } from '@/theme';
 import type { ClassPeriod, Student, Subject, Teacher } from '@/types/database';
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function yesterdayIso(): string {
+function isoDaysAgo(days: number): string {
   const date = new Date();
-  date.setDate(date.getDate() - 1);
+  date.setDate(date.getDate() - days);
   return date.toISOString().slice(0, 10);
 }
 
@@ -34,13 +24,48 @@ export default function NewRecordScreen() {
   const [periods, setPeriods] = useState<ClassPeriod[]>([]);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
-  const [occurredOn, setOccurredOn] = useState(todayIso());
+  const [occurredOn, setOccurredOn] = useState(isoDaysAgo(0));
   const [periodId, setPeriodId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [group, setGroup] = useState<string | null>(null);
+  const params = useLocalSearchParams<{
+    k?: string;
+    period?: string;
+    subject?: string;
+    teacher?: string;
+    group?: string;
+    date?: string;
+  }>();
+
+  useEffect(() => {
+    if (!params.k) return;
+    setPeriodId(params.period ?? null);
+    setSubjectId(params.subject ?? null);
+    setTeacherId(params.teacher ?? null);
+    setStudentId(null);
+    setGroup(params.group ?? null);
+    if (params.date) setOccurredOn(params.date);
+  }, [params.k]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const styles = useThemedStyles((t) => ({
+    container: { flex: 1, backgroundColor: t.background },
+    content: { padding: 16, paddingBottom: 40 },
+    card: { backgroundColor: t.surface, borderRadius: radius.lg, padding: 16, ...cardShadow(t) },
+    warning: {
+      backgroundColor: t.warningSoft,
+      padding: 12,
+      borderRadius: radius.md,
+      marginBottom: 16,
+    },
+    warningText: { color: t.warning, fontSize: 13, fontWeight: '600' },
+    label: { fontSize: 13, fontWeight: '700', color: t.textMuted, marginBottom: 8, letterSpacing: 0.3 },
+    chips: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    groupRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  }));
 
   const loadCatalogs = useCallback(async () => {
     setLoadingCatalogs(true);
@@ -69,19 +94,15 @@ export default function NewRecordScreen() {
   );
 
   const periodOptions: SelectOption[] = useMemo(
-    () => periods.map((p) => ({ id: p.id, label: p.label })),
+    () => periods.map((p) => ({ id: p.id, label: `${p.label} · ${SHIFT_LABEL[p.shift] ?? SHIFT_LABEL.matutino}` })),
     [periods]
   );
-  const subjectOptions: SelectOption[] = useMemo(
-    () => subjects.map((s) => ({ id: s.id, label: s.name })),
-    [subjects]
-  );
-  const teacherOptions: SelectOption[] = useMemo(
-    () => teachers.map((t) => ({ id: t.id, label: t.full_name })),
-    [teachers]
-  );
+  const subjectOptions: SelectOption[] = useMemo(() => subjects.map((s) => ({ id: s.id, label: s.name })), [subjects]);
+  const teacherOptions: SelectOption[] = useMemo(() => teachers.map((t) => ({ id: t.id, label: t.full_name })), [teachers]);
   const studentOptions: SelectOption[] = useMemo(
-    () => students.map((s) => ({ id: s.id, label: s.full_name })),
+    () => students
+      .filter((s) => !group || s.grade_group?.trim() === group)
+      .map((s) => ({ id: s.id, label: s.grade_group ? `${s.full_name} · ${s.grade_group}` : s.full_name })),
     [students]
   );
 
@@ -91,12 +112,17 @@ export default function NewRecordScreen() {
     setTeacherId(null);
     setStudentId(null);
     setReason('');
-    setOccurredOn(todayIso());
+    setGroup(null);
+    setOccurredOn(isoDaysAgo(0));
   };
 
   const handleSubmit = async () => {
     if (!periodId || !subjectId || !teacherId || !studentId) {
       Alert.alert('Falta información', 'Selecciona hora, materia, maestro y alumno.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(occurredOn)) {
+      Alert.alert('Fecha inválida', 'Usa el formato AAAA-MM-DD.');
       return;
     }
     setSaving(true);
@@ -119,135 +145,53 @@ export default function NewRecordScreen() {
   };
 
   const catalogsEmpty =
-    !loadingCatalogs &&
-    (periods.length === 0 || subjects.length === 0 || teachers.length === 0 || students.length === 0);
+    !loadingCatalogs && (periods.length === 0 || subjects.length === 0 || teachers.length === 0 || students.length === 0);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.content}>
-        {catalogsEmpty ? (
-          <Text style={styles.warning}>
-            Falta cargar maestros, materias, alumnos u horarios en la pestaña Catálogos antes de
-            registrar una falta.
-          </Text>
-        ) : null}
+    <Screen>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {catalogsEmpty ? (
+            <View style={styles.warning}>
+              <Text style={styles.warningText}>
+                Faltan maestros, materias, alumnos u horarios. Pide al encargado que los cargue en Catálogos.
+              </Text>
+            </View>
+          ) : null}
 
-        <Text style={styles.label}>Fecha</Text>
-        <View style={styles.dateRow}>
-          <Pressable
-            style={[styles.dateChip, occurredOn === todayIso() && styles.dateChipActive]}
-            onPress={() => setOccurredOn(todayIso())}
-          >
-            <Text
-              style={[styles.dateChipText, occurredOn === todayIso() && styles.dateChipTextActive]}
-            >
-              Hoy
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.dateChip, occurredOn === yesterdayIso() && styles.dateChipActive]}
-            onPress={() => setOccurredOn(yesterdayIso())}
-          >
-            <Text
-              style={[
-                styles.dateChipText,
-                occurredOn === yesterdayIso() && styles.dateChipTextActive,
-              ]}
-            >
-              Ayer
-            </Text>
-          </Pressable>
-        </View>
-        <FormField
-          label="Fecha (AAAA-MM-DD)"
-          value={occurredOn}
-          onChangeText={setOccurredOn}
-          placeholder="2026-09-23"
-        />
+          <View style={styles.card}>
+            <Text style={styles.label}>FECHA</Text>
+            <View style={styles.chips}>
+              <Chip label="Hoy" active={occurredOn === isoDaysAgo(0)} onPress={() => setOccurredOn(isoDaysAgo(0))} />
+              <Chip label="Ayer" active={occurredOn === isoDaysAgo(1)} onPress={() => setOccurredOn(isoDaysAgo(1))} />
+            </View>
+            <FormField icon="calendar-outline" value={occurredOn} onChangeText={setOccurredOn} placeholder="AAAA-MM-DD" />
 
-        <SelectField label="Hora / periodo" options={periodOptions} value={periodId} onChange={setPeriodId} />
-        <SelectField label="Materia" options={subjectOptions} value={subjectId} onChange={setSubjectId} />
-        <SelectField label="Maestro" options={teacherOptions} value={teacherId} onChange={setTeacherId} />
-        <SelectField label="Alumno" options={studentOptions} value={studentId} onChange={setStudentId} />
+            {group ? (
+              <View style={styles.groupRow}>
+                <Chip label={`Grupo ${group} ✕`} active onPress={() => setGroup(null)} />
+              </View>
+            ) : null}
 
-        <FormField
-          label="Razón (opcional)"
-          placeholder="Ej. cita médica, permiso, sin justificar..."
-          value={reason}
-          onChangeText={setReason}
-          multiline
-          numberOfLines={3}
-          style={{ minHeight: 80, textAlignVertical: 'top' }}
-        />
+            <SelectField label="Hora / periodo" options={periodOptions} value={periodId} onChange={setPeriodId} />
+            <SelectField label="Materia" options={subjectOptions} value={subjectId} onChange={setSubjectId} />
+            <SelectField label="Maestro" options={teacherOptions} value={teacherId} onChange={setTeacherId} />
+            <SelectField label="Alumno" options={studentOptions} value={studentId} onChange={setStudentId} />
 
-        <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={saving}>
-          <Text style={styles.submitButtonText}>
-            {saving ? 'Guardando...' : 'Registrar falta'}
-          </Text>
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <FormField
+              label="Razón (opcional)"
+              placeholder="Ej. cita médica, permiso, sin justificar..."
+              value={reason}
+              onChangeText={setReason}
+              multiline
+              numberOfLines={3}
+              style={{ minHeight: 76, textAlignVertical: 'top' }}
+            />
+
+            <Button label="Registrar falta" icon="checkmark-circle" onPress={handleSubmit} loading={saving} />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  content: {
-    padding: 16,
-  },
-  warning: {
-    backgroundColor: '#FEF3C7',
-    color: '#92400E',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    fontSize: 13,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  dateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#E5E7EB',
-  },
-  dateChipActive: {
-    backgroundColor: '#2563EB',
-  },
-  dateChipText: {
-    color: '#374151',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  dateChipTextActive: {
-    color: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-});
